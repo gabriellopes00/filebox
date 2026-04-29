@@ -1,9 +1,0 @@
-{
-  "compilerOptions": {
-    "paths": {
-      "@repo/shared/*": [
-        "packages/shared/src/*"
-      ]
-    }
-  }
-}

@@ -1,9 +1,9 @@
 {
-  "name": "@filebox/client",
+  "name": "client",
   "version": "1.0.0",
   "author": "Gabriel Lopes <gabrielluislopes00@gmail.com>",
   "main": "dist/index.js",
   "dependencies": {
-    "@repo/shared": "*"
+    "@filebox/shared": "workspace:*"
   }
 }

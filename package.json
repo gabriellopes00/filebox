@@ -1,13 +1,14 @@
 {
   "name": "filebox",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "version": "1.0.0",
+  "private": true,
   "scripts": {
-    "dev": "npm run dev -w apps/backend & npm run dev -w apps/frontend",
-    "build": "npm run build -w apps/backend && npm run build -w apps/frontend",
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
     "lint": "npm run lint --workspaces",
     "test": "npm run test --workspaces"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
   }
 }
