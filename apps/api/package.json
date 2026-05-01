@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "author": "Gabriel Lopes <gabrielluislopes00@gmail.com>",
   "main": "dist/index.js",
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@filebox/shared": "workspace:*"
   }

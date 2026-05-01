@@ -1,11 +1,9 @@
 {
   "compilerOptions": {
-    "target": "esnext",
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
+    "target": "ESNext",
+    "moduleResolution": "bundler",
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
-    "rootDir": "."
+    "skipLibCheck": true
   }
 }

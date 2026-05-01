@@ -5,10 +5,23 @@
   "scripts": {
     "dev": "pnpm -r --parallel dev",
     "build": "pnpm -r build",
-    "lint": "npm run lint --workspaces",
-    "test": "npm run test --workspaces"
+    "lint": "pnpm -r lint",
+    "lint:fix": "pnpm -r lint:fix",
+    "format": "pnpm -r format",
+    "format:check": "pnpm -r format:check",
+    "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
-    "typescript": "^6.0.3"
+    "@typescript-eslint/utils": "^8.59.1",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-react": "^7.37.5",
+    "globals": "^16.5.0",
+    "prettier": "^3.8.3",
+    "prettier-plugin-tailwindcss": "^0.8.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.1"
   }
 }
