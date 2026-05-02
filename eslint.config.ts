@@ -51,6 +51,9 @@ export default defineConfig([
         { argsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', caughtErrors: 'none' }
       ],
 
+      // Typescript
+      '@typescript-eslint/no-explicit-any': 'off',
+
       // local rules
       'local/lucide-icon-suffix': 'error'
     }

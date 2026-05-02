@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "lib": [
+      "ESNext"
+    ],
+    "module": "nodenext",
+    "target": "esnext",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "moduleResolution": "nodenext",
+    "jsx": "react",
+    "strict": true,
+    "rootDir": ".",
+    "removeComments": true,
+    "types": [
+      "node",
+    ],
+    "resolveJsonModule": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+    }
+  },
+  "include": [
+    "./src/**/*",
+  ],
+  "exclude": [
+    "./node_modules/",
+  ]
+}

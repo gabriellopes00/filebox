@@ -2,13 +2,24 @@
   "name": "api",
   "version": "1.0.0",
   "author": "Gabriel Lopes <gabrielluislopes00@gmail.com>",
-  "main": "dist/index.js",
+  "type": "module",
   "scripts": {
+    "dev": "serverless offline --reloadHandler",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1041.0",
+    "@aws-sdk/s3-request-presigner": "^3.1041.0",
     "@filebox/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.161",
+    "@types/node": "^24.12.2",
+    "serverless-offline": "^14.5.0",
+    "typescript": "^6.0.3"
   }
 }

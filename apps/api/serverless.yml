@@ -1,0 +1,33 @@
+org: gabriellopes
+service: filebox-api
+
+provider:
+  name: aws
+  runtime: nodejs24.x
+  timeout: 30
+  architecture: arm64
+
+plugins:
+  - serverless-offline
+
+build:
+  esbuild:
+    minify: true
+    sourcemap: false
+
+package:
+  individually: true
+
+functions:
+  hello:
+    handler: src/functions/handler.hello
+    events:
+      - httpApi:
+          path: /
+          method: GET
+  get-user:
+    handler: src/functions/get-user.handler
+    events:
+      - httpApi:
+          path: /users/{id}
+          method: GET
