@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from 'class-variance-authority'
 import { Slot } from 'radix-ui'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/cn'
 import type { ComponentProps } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip'
 

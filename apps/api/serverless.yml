@@ -1,14 +1,50 @@
 org: gabriellopes
 service: filebox-api
 
+useDotenv: true
+
 provider:
   name: aws
   runtime: nodejs24.x
   timeout: 30
   architecture: arm64
+  environment:
+    BUCKET_NAME: ${env:BUCKET_NAME}
+  httpApi:
+    cors:
+      allowedOrigins:
+        - "*"
+      allowedHeaders:
+        - "*"
+      allowedMethods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:BatchWriteItem
+          Resource:
+            - !GetAtt FilesTable.Arn
+        - Effect: Allow
+          Action:
+            - s3:*
+          Resource:
+            - arn:aws:s3:::${env:BUCKET_NAME}/*
 
 plugins:
   - serverless-offline
+  - serverless-dotenv-plugin
 
 build:
   esbuild:
@@ -19,15 +55,84 @@ package:
   individually: true
 
 functions:
-  hello:
-    handler: src/functions/handler.hello
+  get-upload-url:
+    handler: src/functions/http/get-upload-url.handler
     events:
       - httpApi:
-          path: /
-          method: GET
-  get-user:
-    handler: src/functions/get-user.handler
+          path: /upload
+          method: POST
+  list-files:
+    handler: src/functions/http/list-files.handler
     events:
       - httpApi:
-          path: /users/{id}
+          path: /files
           method: GET
+  delete-files:
+    handler: src/functions/http/delete-files.handler
+    events:
+      - httpApi:
+          path: /files/delete
+          method: POST
+  update-file:
+    handler: src/functions/http/update-file.handler
+    events:
+      - httpApi:
+          path: /files/{id}
+          method: PUT
+  complete-upload:
+    handler: src/functions/s3/complete-upload.handler
+    events:
+      - s3:
+          existing: true
+          bucket: ${env:BUCKET_NAME}
+          event: s3:ObjectCreated:*
+
+resources:
+  Resources:
+    FilesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: FileboxFiles
+
+        BillingMode: PAY_PER_REQUEST
+
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+
+        # AttributeDefinitions:
+        #   - AttributeName: pk
+        #     AttributeType: S
+        #   - AttributeName: sk
+        #     AttributeType: S
+        #   - AttributeName: gsi1pk
+        #     AttributeType: S
+        #   - AttributeName: gsi1sk
+        #     AttributeType: S
+
+        # KeySchema:
+        #   - AttributeName: pk
+        #     KeyType: HASH
+        #   - AttributeName: sk
+        #     KeyType: RANGE
+
+        # GlobalSecondaryIndexes:
+        #   - IndexName: GSI1-Checksum
+        #     KeySchema:
+        #       - AttributeName: gsi1pk
+        #         KeyType: HASH
+        #       - AttributeName: gsi1sk
+        #         KeyType: RANGE
+        #     Projection:
+        #       ProjectionType: ALL
+
+        # SSESpecification:
+        #   SSEEnabled: true

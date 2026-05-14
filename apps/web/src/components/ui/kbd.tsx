@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/cn'
 import type { ComponentProps } from 'react'
 
 function Kbd({ className, ...props }: ComponentProps<'kbd'>) {

@@ -11,10 +11,10 @@ import {
   SidebarMenuItem,
   useSidebar
 } from '@/components/ui/sidebar'
-import { Trash2Icon, GalleryVerticalEndIcon, UploadIcon, LinkIcon } from 'lucide-react'
+import { Trash2Icon, GalleryVerticalEndIcon, UploadIcon, LinkIcon, ImageIcon } from 'lucide-react'
 import { type ComponentProps, useState } from 'react'
-import { SideBarUpload } from './side-bar-upload'
 import { SideBarLinks } from './side-bar-links'
+import { SideBarUpload } from './side-bar-upload'
 
 const tabs = [
   {
@@ -26,6 +26,11 @@ const tabs = [
     label: 'Links',
     name: 'links',
     icon: <LinkIcon />
+  },
+  {
+    label: 'Images',
+    name: 'images',
+    icon: <ImageIcon />
   },
   {
     label: 'Trash',

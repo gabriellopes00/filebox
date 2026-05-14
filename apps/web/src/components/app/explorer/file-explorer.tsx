@@ -3,32 +3,37 @@ import { FileIcon } from '@/components/file-icon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/cn'
+import { format } from 'date-fns'
 import { formatBytes } from '@/utils/format-bytes'
-import { getFileExtension } from '@filebox/shared/utils/get-file-extension'
-import type { FileData } from '@filebox/shared/src/file-data'
-import { useQuery } from '@tanstack/react-query'
+import { getFileExtension } from '@filebox/shared/utils/file'
+import type { FileData } from '@filebox/shared/data/file-data'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  CopyIcon,
-  DownloadIcon,
-  EllipsisVerticalIcon,
-  FolderPlusIcon,
-  MoveIcon,
-  PencilIcon,
-  RefreshCwIcon,
-  SearchIcon,
-  Share2Icon,
-  Trash2Icon,
-  XIcon
+    ChevronDownIcon,
+    ChevronRightIcon,
+    CopyIcon,
+    DownloadIcon,
+    EllipsisVerticalIcon,
+    FolderIcon,
+    FolderPlusIcon,
+    MoveIcon,
+    PencilIcon,
+    RefreshCwIcon,
+    SearchIcon,
+    Share2Icon,
+    Trash2Icon,
+    XIcon
 } from 'lucide-react'
 import { useState } from 'react'
 
 // type EntryKind = 'folder' | 'file'
 
-// interface TreeNode {
-//   name: string
-//   children?: TreeNode[]
-// }
+interface TreeNode {
+  name: string
+  children?: TreeNode[]
+}
 
 // interface FileRow {
 //   name: string
@@ -38,22 +43,22 @@ import { useState } from 'react'
 //   size: string
 // }
 
-// const tree: TreeNode[] = [
-//   {
-//     name: 'Folder name',
-//     children: [
-//       { name: 'scripts' },
-//       { name: 'front-end' },
-//       {
-//         name: 'Web assets',
-//         children: [{ name: 'logs' }, { name: 'testfolder' }, { name: 'public_html' }]
-//       }
-//     ]
-//   },
-//   { name: 'backup_files', children: [] },
-//   { name: 'others' },
-//   { name: 'New folder' }
-// ]
+const tree: TreeNode[] = [
+  {
+    name: 'Folder name',
+    children: [
+      { name: 'scripts' },
+      { name: 'front-end' },
+      {
+        name: 'Web assets',
+        children: [{ name: 'logs' }, { name: 'testfolder' }, { name: 'public_html' }]
+      }
+    ]
+  },
+  { name: 'backup_files', children: [] },
+  { name: 'others' },
+  { name: 'New folder' }
+]
 
 // const rows: FileRow[] = [
 //   {
@@ -110,7 +115,7 @@ import { useState } from 'react'
 export function FileExplorer() {
   const [selected, setSelected] = useState<FileData | null>(null)
 
-  const { data: files = [] } = useQuery({
+  const { data: files = [], isLoading } = useQuery({
     queryKey: ['files'],
     queryFn: () => FileApi.getFiles()
   })
@@ -120,9 +125,9 @@ export function FileExplorer() {
       <Toolbar />
       {/* <AddressBar /> */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        {/* <Tree /> */}
-        {/* <Separator orientation="vertical" className="data-[orientation=vertical]:h-auto" /> */}
-        <FileList files={files} selected={selected} onSelect={setSelected} />
+        <Tree />
+        <Separator orientation="vertical" className="data-[orientation=vertical]:h-auto" />
+        <FileList files={files} isLoading={isLoading} selected={selected} onSelect={setSelected} />
         {selected && (
           <>
             <Separator orientation="vertical" className="data-[orientation=vertical]:h-auto" />
@@ -136,17 +141,7 @@ export function FileExplorer() {
 
 function FileDetails({ file, onClose }: { file: FileData; onClose: () => void }) {
   const ext = getFileExtension(file.name)
-
   const typeLabel = ext ? `${ext.toUpperCase()} File` : file.contentType || 'File'
-  const uploadedAt = file.uploadedAt
-    ? new Date(file.uploadedAt).toLocaleString(undefined, {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
-    : '—'
 
   return (
     <aside className="flex w-80 shrink-0 flex-col overflow-auto">
@@ -194,7 +189,9 @@ function FileDetails({ file, onClose }: { file: FileData; onClose: () => void })
           <dd className="truncate">{formatBytes(file.size)}</dd>
 
           <dt className="text-muted-foreground">Uploaded at</dt>
-          <dd className="truncate">{uploadedAt}</dd>
+          <dd className="truncate">
+            {file.uploadedAt ? format(file.uploadedAt, 'MMM dd, yyyy') : '-'}
+          </dd>
 
           {file.checksum && (
             <>
@@ -209,6 +206,11 @@ function FileDetails({ file, onClose }: { file: FileData; onClose: () => void })
 }
 
 function Toolbar() {
+  const queryClient = useQueryClient()
+
+  function reload() {
+    queryClient.invalidateQueries({ queryKey: ['files'] })
+  }
   return (
     <div className="flex shrink-0 items-center justify-center gap-0.5 border-b px-2 py-1.5">
       <ToolbarButton icon={<FolderPlusIcon />} label="Add folder" />
@@ -219,7 +221,7 @@ function Toolbar() {
       <ToolbarButton disabled icon={<PencilIcon />} label="Rename" />
       <ToolbarButton disabled icon={<Trash2Icon />} label="Delete" />
       <Separator orientation="vertical" className="mx-1 data-[orientation=vertical]:h-full" />
-      <ToolbarButton icon={<RefreshCwIcon />} />
+      <ToolbarButton icon={<RefreshCwIcon />} onClick={reload} />
 
       <div className="relative flex w-full items-center">
         <SearchIcon className="absolute left-2 size-3.5 text-muted-foreground" />
@@ -232,11 +234,13 @@ function Toolbar() {
 function ToolbarButton({
   icon,
   label,
-  disabled
+  disabled,
+  onClick
 }: {
   icon: React.ReactNode
   label?: string
   disabled?: boolean
+  onClick?: () => void
 }) {
   return (
     <Button
@@ -244,6 +248,7 @@ function ToolbarButton({
       size="sm"
       className="font-normal text-muted-foreground hover:text-foreground"
       disabled={disabled}
+      onClick={onClick}
     >
       {icon}
       {label && <span>{label}</span>}
@@ -290,78 +295,80 @@ function ToolbarButton({
 //   )
 // }
 
-// function Tree() {
-//   return (
-//     <div className="w-64 shrink-0 overflow-auto py-2 [scrollbar-width:thin]">
-//       <ul className="text-sm">
-//         {tree.map((node) => (
-//           <TreeItem
-//             key={node.name}
-//             node={node}
-//             depth={0}
-//             defaultOpen={node.name === 'Folder name'}
-//           />
-//         ))}
-//       </ul>
-//     </div>
-//   )
-// }
+function Tree() {
+  return (
+    <div className="w-64 shrink-0 overflow-auto py-2 [scrollbar-width:thin]">
+      <ul className="text-sm">
+        {tree.map((node) => (
+          <TreeItem
+            key={node.name}
+            node={node}
+            depth={0}
+            defaultOpen={node.name === 'Folder name'}
+          />
+        ))}
+      </ul>
+    </div>
+  )
+}
 
-// function TreeItem({
-//   node,
-//   depth,
-//   defaultOpen = false
-// }: {
-//   node: TreeNode
-//   depth: number
-//   defaultOpen?: boolean
-// }) {
-//   const [open, setOpen] = useState(defaultOpen)
-//   const hasChildren = node.children && node.children.length > 0
-//   const isExpandable = node.children !== undefined
+function TreeItem({
+  node,
+  depth,
+  defaultOpen = false
+}: {
+  node: TreeNode
+  depth: number
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  const hasChildren = node.children && node.children.length > 0
+  const isExpandable = node.children !== undefined
 
-//   return (
-//     <li>
-//       <button
-//         type="button"
-//         onClick={() => isExpandable && setOpen((v) => !v)}
-//         className="flex w-full items-center gap-1 rounded-md py-1 pr-2 text-left hover:bg-muted"
-//         style={{ paddingLeft: 8 + depth * 14 }}
-//       >
-//         <span className="flex size-3.5 items-center justify-center text-muted-foreground">
-//           {isExpandable ? (
-//             open ? (
-//               <ChevronDownIcon className="size-3.5" />
-//             ) : (
-//               <ChevronRightIcon className="size-3.5" />
-//             )
-//           ) : null}
-//         </span>
-//         <FolderIcon className="size-4 text-muted-foreground" />
-//         <span className="truncate">{node.name}</span>
-//       </button>
-//       {hasChildren && open && (
-//         <ul>
-//           {node.children!.map((child) => (
-//             <TreeItem
-//               key={child.name}
-//               node={child}
-//               depth={depth + 1}
-//               defaultOpen={child.name === 'Web assets'}
-//             />
-//           ))}
-//         </ul>
-//       )}
-//     </li>
-//   )
-// }
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => isExpandable && setOpen((v) => !v)}
+        className="flex w-full items-center gap-1 rounded-md py-1 pr-2 text-left hover:bg-muted"
+        style={{ paddingLeft: 8 + depth * 14 }}
+      >
+        <span className="flex size-3.5 items-center justify-center text-muted-foreground">
+          {isExpandable ? (
+            open ? (
+              <ChevronDownIcon className="size-3.5" />
+            ) : (
+              <ChevronRightIcon className="size-3.5" />
+            )
+          ) : null}
+        </span>
+        <FolderIcon className="size-4 text-muted-foreground" />
+        <span className="truncate">{node.name}</span>
+      </button>
+      {hasChildren && open && (
+        <ul>
+          {node.children!.map((child) => (
+            <TreeItem
+              key={child.name}
+              node={child}
+              depth={depth + 1}
+              defaultOpen={child.name === 'Web assets'}
+            />
+          ))}
+        </ul>
+      )}
+    </li>
+  )
+}
 
 function FileList({
   files,
+  isLoading,
   selected,
   onSelect
 }: {
   files?: FileData[]
+  isLoading?: boolean
   selected: FileData | null
   onSelect: (file: FileData) => void
 }) {
@@ -374,36 +381,51 @@ function FileList({
         <span className="text-right">Size</span>
       </div>
       <ul>
-        {files?.map((file) => (
-          <li key={file.id}>
-            <button
-              type="button"
-              onClick={() => onSelect(file)}
-              className={cn(
-                'grid w-full grid-cols-[minmax(0,1fr)_180px_120px_100px] items-center gap-4 px-4 py-2 text-left text-sm hover:bg-muted',
-                selected?.id === file.id && 'bg-muted'
-              )}
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                {/* {file.kind === 'folder' ? (
-                  <FolderIcon className="size-4 shrink-0 text-muted-foreground" />
-                ) : ( */}
-                <FileIcon
-                  className="size-5 shrink-0 text-muted-foreground"
-                  type={file.contentType}
-                  ext={getFileExtension(file.name)}
-                />
-                {/* )} */}
-                <span className="truncate">{file.name}</span>
-              </span>
-              <span className="truncate text-muted-foreground">
-                {file.uploadedAt?.toISOString() ?? ''}
-              </span>
-              <span className="truncate text-muted-foreground">{file.contentType}</span>
-              <span className="text-right text-muted-foreground">{formatBytes(file.size)}</span>
-            </button>
-          </li>
-        ))}
+        {isLoading &&
+          Array.from({ length: 4 }).map((_, i) => (
+            <li key={i}>
+              <div className="grid w-full grid-cols-[minmax(0,1fr)_180px_120px_100px] items-center gap-4 px-4 py-2 text-sm">
+                <span className="flex min-w-0 items-center gap-2">
+                  <Skeleton className="size-5 shrink-0 rounded-sm" />
+                  <Skeleton className="h-4 w-40" />
+                </span>
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="ml-auto h-4 w-16" />
+              </div>
+            </li>
+          ))}
+        {!isLoading &&
+          files?.map((file) => (
+            <li key={file.id}>
+              <button
+                type="button"
+                onClick={() => onSelect(file)}
+                className={cn(
+                  'grid w-full grid-cols-[minmax(0,1fr)_180px_120px_100px] items-center gap-4 px-4 py-2 text-left text-sm hover:bg-muted',
+                  selected?.id === file.id && 'bg-muted'
+                )}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  {/* {file.kind === 'folder' ? (
+                    <FolderIcon className="size-4 shrink-0 text-muted-foreground" />
+                  ) : ( */}
+                  <FileIcon
+                    className="size-5 shrink-0 text-muted-foreground"
+                    type={file.contentType}
+                    ext={getFileExtension(file.name)}
+                  />
+                  {/* )} */}
+                  <span className="truncate">{file.name}</span>
+                </span>
+                <span className="truncate text-muted-foreground">
+                  {file.uploadedAt ? format(file.uploadedAt, 'MMM dd, yyyy') : '-'}
+                </span>
+                <span className="truncate text-muted-foreground">{file.contentType}</span>
+                <span className="text-right text-muted-foreground">{formatBytes(file.size)}</span>
+              </button>
+            </li>
+          ))}
       </ul>
     </div>
   )
