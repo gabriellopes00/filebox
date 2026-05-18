@@ -22,13 +22,12 @@ export function FileUploadItemProgress(props: FileUploadItemProgressProps) {
           // status === 'error' && 'text-destructive'
         )}
       >
-        {status === 'uploading'
-          ? `Uploading ${Math.round(progress)}%`
-          : status === 'success'
-            ? 'Uploaded successfully'
-            : status === 'error'
-              ? 'Error'
-              : 'Ready'}
+        {(status === 'waiting' || status === 'queued') && 'Waiting...'}
+        {status === 'hashing' && 'Preparing file...'}
+        {status === 'ready' && 'Ready'}
+        {status === 'uploading' && `Uploading ${Math.round(progress)}%`}
+        {status === 'success' && 'Uploaded successfully'}
+        {status === 'error' && 'Error'}
       </span>
       <div
         role="progressbar"

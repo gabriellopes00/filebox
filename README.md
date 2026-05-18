@@ -5,12 +5,12 @@ Complete upload & download flow with AWS S3 pre-signed URLs and large file proce
 
 ## features:
 - [x] File upload to S3 with presigned URLs
-- [x] Large file processing with multipart upload
+- [ ] Large file processing with multipart upload
 - [x] File download from S3 with presigned URLs
 - [x] Checksum validation for file integrity
 - [x] Dynamodb for file metadata storage sync
-- [x] Delete file flow with S3 delete-markers & lifecycle policies
-- [x] Video streaming support
+- [x] Delete & restore files flow with S3 delete-markers & lifecycle policies
+- [ ] Video streaming support
 - [ ] Folder support with prefix-based operations
 - [ ] Imagine processing with AWS SQS and Lambda
 

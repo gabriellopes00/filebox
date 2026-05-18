@@ -9,15 +9,15 @@ export async function handler(event: S3Event): Promise<void> {
       new UpdateCommand({
         TableName: 'FileboxFiles',
         Key: { id: getFileName(record.s3.object.key) },
-        UpdateExpression: 'SET #uploadedAt = :uploadedAt, #size = :size REMOVE #ttl',
+        UpdateExpression: 'SET #uploadedAt = :uploadedAt, #status = :status REMOVE #ttl',
         ExpressionAttributeNames: {
           '#uploadedAt': 'uploadedAt',
-          '#size': 'size',
+          '#status': 'status',
           '#ttl': 'ttl'
         },
         ExpressionAttributeValues: {
           ':uploadedAt': record.eventTime,
-          ':size': record.s3.object.size
+          ':status': 'uploaded'
         }
       })
   )

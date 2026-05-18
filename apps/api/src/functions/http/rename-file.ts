@@ -4,20 +4,19 @@ import { parseHttpResponse } from '@/utils/parse-http-response.js'
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda'
 
-interface UpdateFileRequestBody {
-  id: string
+interface RenameFileRequestBody {
   name: string
 }
 
-interface UpdateFilePathParams {
-  fileId: string
+interface RenameFilePathParams {
+  id: string
 }
 
 export async function handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> {
-  const req = parseHttpEvent<UpdateFileRequestBody, UpdateFilePathParams>(event)
-  const { fileId } = req.pathParams
+  const req = parseHttpEvent<RenameFileRequestBody, RenameFilePathParams>(event)
+  const { id } = req.pathParams
 
-  const command = new GetCommand({ TableName: 'FileboxFiles', Key: { id: fileId } })
+  const command = new GetCommand({ TableName: 'FileboxFiles', Key: { id } })
   const { Item } = await dynamoDbClient.send(command)
 
   if (!Item) {
@@ -26,7 +25,7 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
 
   const updateCommand = new UpdateCommand({
     TableName: 'FileboxFiles',
-    Key: { id: fileId },
+    Key: { id },
     UpdateExpression: 'SET #name = :name',
     ExpressionAttributeNames: { '#name': 'name' },
     ExpressionAttributeValues: { ':name': req.body.name }

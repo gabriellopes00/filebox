@@ -34,6 +34,7 @@ provider:
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
             - dynamodb:BatchWriteItem
+            - dynamodb:BatchGetItem
           Resource:
             - !GetAtt FilesTable.Arn
         - Effect: Allow
@@ -55,6 +56,12 @@ package:
   individually: true
 
 functions:
+  get-download-url:
+    handler: src/functions/http/get-download-url.handler
+    events:
+      - httpApi:
+          path: /download
+          method: POST
   get-upload-url:
     handler: src/functions/http/get-upload-url.handler
     events:
@@ -73,12 +80,24 @@ functions:
       - httpApi:
           path: /files/delete
           method: POST
-  update-file:
-    handler: src/functions/http/update-file.handler
+  copy-files:
+    handler: src/functions/http/copy-files.handler
     events:
       - httpApi:
-          path: /files/{id}
-          method: PUT
+          path: /files/copy
+          method: POST
+  restore-files:
+    handler: src/functions/http/restore-files.handler
+    events:
+      - httpApi:
+          path: /files/restore
+          method: POST
+  rename-file:
+    handler: src/functions/http/rename-file.handler
+    events:
+      - httpApi:
+          path: /files/{id}/rename
+          method: POST
   complete-upload:
     handler: src/functions/s3/complete-upload.handler
     events:
@@ -86,6 +105,20 @@ functions:
           existing: true
           bucket: ${env:BUCKET_NAME}
           event: s3:ObjectCreated:*
+  complete-file-deletion:
+    handler: src/functions/s3/complete-file-deletion.handler
+    events:
+      - s3:
+          existing: true
+          bucket: ${env:BUCKET_NAME}
+          event: s3:ObjectRemoved:DeleteMarkerCreated
+  cleanup-file-deletion:
+    handler: src/functions/s3/cleanup-file-deletion.handler
+    events:
+      - s3:
+          existing: true
+          bucket: ${env:BUCKET_NAME}
+          event: s3:ObjectRemoved:Delete
 
 resources:
   Resources:

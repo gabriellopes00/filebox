@@ -4,7 +4,7 @@ export interface GetUploadUrlsParams {
     filename: string
     size: number
     contentType: string
-    checksum?: string
+    checksum: string
   }[]
 }
 

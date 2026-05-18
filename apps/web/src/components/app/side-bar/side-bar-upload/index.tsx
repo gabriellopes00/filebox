@@ -17,13 +17,23 @@ import { nanoid } from 'nanoid'
 import type { GetUploadUrlsParams } from '@filebox/shared/http-contracts/get-upload-url'
 import { FileApi, type FileUploadStatus } from '@/api/files-api'
 import { cn } from '@/lib/cn'
+import { computeFileChecksum } from '@/lib/checksum'
 import { FileUploadItemPreview } from './file-upload-item-preview'
 import { FileUploadItemMetadata } from './file-upload-item-metadata'
 import { FileUploadItemProgress } from './file-upload-item-progress'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
+import pLimit from 'p-limit'
+import { Separator } from '@/components/ui/separator'
+import { Field, FieldDescription } from '@/components/ui/field'
+import { InputGroup, InputGroupInput, InputGroupAddon } from '@/components/ui/input-group'
+import { ButtonGroup } from '@/components/ui/button-group'
+import { Kbd } from '@/components/ui/kbd'
 
-type FormFile = { data: File; progress: number; status: FileUploadStatus }
+const hashLimit = pLimit(3)
+const hashAbortControllers = new Map<string, AbortController>()
+
+type FormFile = { data: File; progress: number; status: FileUploadStatus; checksum?: string }
 interface UploadFormValues {
   files: Record<string, FormFile>
 }
@@ -39,7 +49,8 @@ export function SideBarUpload() {
           clientRef,
           filename: file.data.name,
           size: file.data.size,
-          contentType: file.data.type
+          contentType: file.data.type,
+          checksum: file.checksum!
         }))
       }
 
@@ -51,6 +62,7 @@ export function SideBarUpload() {
           FileApi.upload(
             uploadUrl,
             files[fileRef].data,
+            files[fileRef].checksum!,
             (progress) => form.setValue(`files.${fileRef}.progress`, progress),
             (status) => form.setValue(`files.${fileRef}.status`, status)
           )
@@ -65,10 +77,20 @@ export function SideBarUpload() {
   }
 
   function handleClearFiles() {
+    const currentFiles = form.getValues('files')
+
+    Object.keys(currentFiles).forEach((fileRef) => {
+      hashAbortControllers.get(fileRef)?.abort()
+      hashAbortControllers.delete(fileRef)
+    })
+
     form.setValue('files', {})
   }
 
   function handleRemoveFile(fileRef: string) {
+    hashAbortControllers.get(fileRef)?.abort()
+    hashAbortControllers.delete(fileRef)
+
     const prev = form.getValues('files')
     const updated = Object.fromEntries(Object.entries(prev).filter(([k]) => k !== fileRef))
     form.setValue('files', updated)
@@ -80,7 +102,7 @@ export function SideBarUpload() {
       ...newFiles.reduce(
         (acc, file) => {
           const ref = nanoid()
-          acc[ref] = { data: file, status: 'ready', progress: 0 }
+          acc[ref] = { data: file, status: 'waiting', progress: 0 }
           return acc
         },
         {} as Record<string, FormFile>
@@ -104,10 +126,52 @@ export function SideBarUpload() {
   })
 
   const files = form.watch('files')
+  const isReady = Object.values(files).every(
+    (file) => file.status !== 'waiting' && file.status !== 'hashing'
+  )
 
   useEffect(() => {
     if (form.formState.isSubmitSuccessful) form.reset()
   }, [form.formState.isSubmitSuccessful, form.reset])
+
+  useEffect(() => {
+    const waitingFiles = Object.entries(files).filter(([, file]) => file.status === 'waiting')
+    if (waitingFiles.length === 0) return
+
+    for (const [fileRef, file] of waitingFiles) {
+      form.setValue(`files.${fileRef}.status`, 'queued')
+      const controller = new AbortController()
+      hashAbortControllers.set(fileRef, controller)
+
+      hashLimit(async () => {
+        try {
+          if (controller.signal.aborted) return
+
+          form.setValue(`files.${fileRef}.status`, 'hashing')
+
+          const checksum = await computeFileChecksum(file.data, {
+            signal: controller.signal,
+            onProgress: (progress) => {
+              if (controller.signal.aborted) return
+
+              form.setValue(`files.${fileRef}.progress`, progress)
+              if (progress === 100) form.setValue(`files.${fileRef}.status`, 'ready')
+            }
+          })
+
+          if (controller.signal.aborted) return
+
+          form.setValue(`files.${fileRef}.checksum`, checksum)
+          form.setValue(`files.${fileRef}.progress`, 0)
+        } catch (error) {
+          if (controller.signal.aborted) return
+          console.error('Failed to hash file:', file.data.name, error)
+        } finally {
+          hashAbortControllers.delete(fileRef)
+        }
+      })
+    }
+  }, [files, form])
 
   return (
     <Sidebar collapsible="none" className="hidden flex-1 md:flex">
@@ -135,6 +199,34 @@ export function SideBarUpload() {
               Browse files
             </Button>
           </div>
+
+          {Object.keys(files).length === 0 && (
+            <>
+              <div className="relative my-5 flex w-full items-center">
+                <Separator className="flex-1" />
+                <span className="shrink-0 px-4 text-xs font-medium text-muted-foreground">
+                  Or import from URL
+                </span>
+                <Separator className="flex-1" />
+              </div>
+              <Field>
+                <ButtonGroup>
+                  <InputGroup>
+                    <InputGroupInput id="input-group-url" placeholder="https://myfile.pdf" />
+                    <InputGroupAddon align="inline-end">
+                      <Kbd className="ml-1">Ctrl + v</Kbd>
+                    </InputGroupAddon>
+                  </InputGroup>
+                  <Button variant="outline">Import</Button>
+                </ButtonGroup>
+                <FieldDescription className="px-2 text-xs">
+                  The file will be fetched from the provided URL, so make sure it is{' '}
+                  <b>publicly accessible</b> and supports CORS. <br />
+                  Unallowed file types or files larger than 500MB will be rejected.
+                </FieldDescription>
+              </Field>
+            </>
+          )}
         </SidebarHeader>
 
         <SidebarContent className="[scrollbar-width:thin]">
@@ -154,7 +246,10 @@ export function SideBarUpload() {
                     <div className="flex w-full items-center gap-2">
                       <FileUploadItemPreview file={file.data} />
                       <FileUploadItemMetadata file={file.data} />
-                      {file.status === 'ready' && (
+                      {(file.status === 'ready' ||
+                        file.status === 'hashing' ||
+                        file.status === 'waiting' ||
+                        file.status === 'queued') && (
                         <Button
                           type="button"
                           tooltip="Remove"
@@ -205,9 +300,17 @@ export function SideBarUpload() {
                 </PopoverContent>
               </Popover>
 
-              <Button className="flex-1" type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting && <Spinner />}
-                Upload
+              <Button
+                className="flex-1"
+                type="submit"
+                disabled={form.formState.isSubmitting || !isReady}
+              >
+                {(form.formState.isSubmitting || !isReady) && <Spinner />}
+                {isReady
+                  ? form.formState.isSubmitting
+                    ? 'Uploading...'
+                    : 'Upload'
+                  : 'Preparing...'}
               </Button>
             </div>
           </SidebarFooter>

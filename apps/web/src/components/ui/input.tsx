@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn'
+import type { ComponentProps } from 'react'
 
 function Input({ className, type, ...props }: ComponentProps<'input'>) {
   return (

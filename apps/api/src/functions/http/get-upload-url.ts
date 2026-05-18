@@ -13,6 +13,7 @@ import type {
 } from '@filebox/shared/http-contracts/get-upload-url.js'
 import { getFileKey, getFileExtension } from '@filebox/shared/utils/file.js'
 import { s3Client } from '@/lib/s3-client.js'
+import type { FileStatus } from '@filebox/shared/data/file-data.js'
 
 export async function handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> {
   const { body } = parseHttpEvent<GetUploadUrlsParams>(event)
@@ -20,20 +21,26 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
   const files: { data: File; uploadUrl: string; clientRef: string }[] = []
   for (const { clientRef, filename, contentType, size, checksum } of body.files) {
     const fileId = randomUUID()
-    const file = new File({ id: fileId, name: filename, size, contentType, checksum })
+    const status: FileStatus = 'pending'
+    const file = new File({ id: fileId, name: filename, size, contentType, checksum, status })
 
     const fileExtension = getFileExtension(file.name)
     const fileKey = getFileKey(fileId, fileExtension)
 
+    const base64Checksum = Buffer.from(checksum, 'hex').toString('base64')
     const uploadUrl = await getSignedUrl(
       s3Client,
       new PutObjectCommand({
         Bucket: process.env.BUCKET_NAME,
         Key: fileKey,
         ContentType: contentType,
-        ContentLength: size
+        ContentLength: size,
+        ChecksumSHA256: base64Checksum
       }),
-      { expiresIn: 60 * 5 }
+      {
+        expiresIn: 60 * 5,
+        unhoistableHeaders: new Set(['x-amz-checksum-sha256'])
+      }
     )
 
     files.push({ data: file, uploadUrl, clientRef })

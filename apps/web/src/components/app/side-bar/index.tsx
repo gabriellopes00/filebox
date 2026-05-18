@@ -11,9 +11,9 @@ import {
   SidebarMenuItem,
   useSidebar
 } from '@/components/ui/sidebar'
-import { Trash2Icon, GalleryVerticalEndIcon, UploadIcon, LinkIcon, ImageIcon } from 'lucide-react'
+import { Trash2Icon, GalleryVerticalEndIcon, UploadIcon } from 'lucide-react'
 import { type ComponentProps, useState } from 'react'
-import { SideBarLinks } from './side-bar-links'
+import { SideBarTrash } from './side-bar-trash'
 import { SideBarUpload } from './side-bar-upload'
 
 const tabs = [
@@ -22,16 +22,21 @@ const tabs = [
     name: 'upload',
     icon: <UploadIcon />
   },
-  {
-    label: 'Links',
-    name: 'links',
-    icon: <LinkIcon />
-  },
-  {
-    label: 'Images',
-    name: 'images',
-    icon: <ImageIcon />
-  },
+  // {
+  //   label: 'Links',
+  //   name: 'links',
+  //   icon: <LinkIcon />
+  // },
+  // {
+  //   label: 'Images',
+  //   name: 'images',
+  //   icon: <ImageIcon />
+  // },
+  // {
+  //   label: 'Streaming',
+  //   name: 'streaming',
+  //   icon: <TvMinimalPlayIcon />
+  // },
   {
     label: 'Trash',
     name: 'trash',
@@ -90,7 +95,7 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
       </Sidebar>
 
       {activeTab === 'upload' && <SideBarUpload />}
-      {activeTab === 'links' && <SideBarLinks />}
+      {activeTab === 'trash' && <SideBarTrash />}
     </Sidebar>
   )
 }
