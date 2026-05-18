@@ -1,4 +1,4 @@
-![Screenshot](docs/screenshot.png)
+![Screenshot](docs/screenshot.jpeg)
 # Filebox 📦
 
 Complete upload & download flow with AWS S3 pre-signed URLs and large file processing with aws lambda and dynamodb.
