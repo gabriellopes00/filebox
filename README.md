@@ -10,7 +10,7 @@ Complete upload & download flow with AWS S3 pre-signed URLs and large file proce
 - [x] Checksum validation for file integrity
 - [x] Dynamodb for file metadata storage sync
 - [x] Delete & restore files flow with S3 delete-markers & lifecycle policies
-- [ ] Copy files on S3 & update metadata in DynamoDB
+- [x] Copy files on S3 & update metadata in DynamoDB
 - [ ] File sharing via expiring pre-signed URLs with URL shortening
 - [ ] Video streaming support
 - [ ] Folder support with prefix-based operations
