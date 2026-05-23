@@ -1,20 +1,21 @@
 ![Screenshot](docs/screenshot.jpeg)
 # Filebox 📦
 
-Complete upload & download flow with AWS S3 pre-signed URLs and large file processing with aws lambda and dynamodb.
+Complete upload & download flow with AWS S3 pre-signed URLs and large file processing with aws lambda and dynamodb. Everything with error tolerance and retries.
 
 ## features:
 - [x] File upload to S3 with presigned URLs
-- [ ] Large file processing with multipart upload
+- [x] Large file processing with multipart uploads (50MB+)
+- [ ] Pause/resume uploads
 - [x] File download from S3 with presigned URLs
-- [x] Checksum validation for file integrity
+- [x] Checksum validation for file integrity 
 - [x] Dynamodb for file metadata storage sync
 - [x] Delete & restore files flow with S3 delete-markers & lifecycle policies
 - [x] Copy files on S3 & update metadata in DynamoDB
 - [ ] File sharing via expiring pre-signed URLs with URL shortening
 - [ ] Video streaming support
 - [ ] Folder support with prefix-based operations
-- [ ] Imagine processing with AWS SQS and Lambda
+- [ ] Image processing with AWS SQS and Lambda
 
 ## Project stack & layout
 This project is a monorepo managed with pnpm workspaces, containing the backend API and the frontend web app, along with shared types and utilities in a separate package.
@@ -43,17 +44,13 @@ pnpm install
 
 ### 2. Configure environment variables
 
-**`apps/api/.env`** — copy from the example and set your bucket name:
-
-```bash
-cp apps/api/.env.example apps/api/.env
-```
+Copy **`apps/api/.env.example`** to **`apps/api/.env`** — set your bucket name:
 
 ```env
 BUCKET_NAME=your-s3-bucket-name
 ```
 
-**`apps/web/.env`** — point the web app at your API:
+Same thing on web app: **`apps/web/.env`** — point the web app at your API:
 
 ```env
 VITE_SERVER_URL=http://localhost:3000

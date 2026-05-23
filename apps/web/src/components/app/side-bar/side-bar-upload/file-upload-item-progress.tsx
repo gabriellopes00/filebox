@@ -15,27 +15,19 @@ export function FileUploadItemProgress(props: FileUploadItemProgressProps) {
 
   return (
     <div className="relative flex w-full flex-1 flex-col gap-0.5">
-      <span
-        className={cn(
-          'text-xs text-muted-foreground'
-          // status === 'success' && 'text-green-600',
-          // status === 'error' && 'text-destructive'
-        )}
-      >
+      <span className={cn('text-xs text-muted-foreground')}>
         {(status === 'waiting' || status === 'queued') && 'Waiting...'}
         {status === 'hashing' && 'Preparing file...'}
         {status === 'ready' && 'Ready'}
         {status === 'uploading' && `Uploading ${Math.round(progress)}%`}
         {status === 'success' && 'Uploaded successfully'}
-        {status === 'error' && 'Error'}
+        {status === 'error' && 'There was a problem uploading this file. Try again.'}
       </span>
       <div
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
-        // aria-valuenow={itemContext.fileState.progress}
-        // aria-valuetext={`${itemContext.fileState.progress}%`}
-        // aria-labelledby={itemContext.nameId}
+        aria-valuenow={progress}
         data-slot="file-upload-progress"
         {...progressProps}
         className={cn(

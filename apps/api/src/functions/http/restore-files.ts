@@ -2,40 +2,40 @@ import { dynamoDbClient } from '@/lib/dynamo-db-client.js'
 import { s3Client } from '@/lib/s3-client.js'
 import { parseHttpEvent } from '@/utils/parse-http-event.js'
 import { parseHttpResponse } from '@/utils/parse-http-response.js'
-import { TransactWriteCommand } from '@aws-sdk/lib-dynamodb'
+import { BatchGetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb'
 import { DeleteObjectCommand, ListObjectVersionsCommand } from '@aws-sdk/client-s3'
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda'
-
-type RestoreFilesParams = {
-  fileIds: string[]
-}
+import type { FileIdsParams } from '@filebox/shared/http-contracts/file-id-params.js'
 
 export async function handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> {
-  const { body } = parseHttpEvent<RestoreFilesParams>(event)
+  const { body } = parseHttpEvent<FileIdsParams>(event)
   const { fileIds } = body
 
+  const { Responses } = await dynamoDbClient.send(
+    new BatchGetCommand({ RequestItems: { FileboxFiles: { Keys: fileIds.map((id) => ({ id })) } } })
+  )
+
+  const files = Responses?.FileboxFiles ?? []
+
   await Promise.all(
-    fileIds.map(async (id) => {
+    files.map(async (file) => {
       // find latest delete marker
       const versions = await s3Client.send(
-        new ListObjectVersionsCommand({
-          Bucket: process.env.BUCKET_NAME,
-          Prefix: id
-        })
+        new ListObjectVersionsCommand({ Bucket: process.env.BUCKET_NAME, Prefix: file.key })
       )
 
       const deleteMarker = versions.DeleteMarkers?.find(
-        (marker) => marker.Key === id && marker.IsLatest
+        (marker) => marker.Key === file.key && marker.IsLatest
       )
 
       if (!deleteMarker?.VersionId) {
-        throw new Error(`Delete marker not found for ${id}`)
+        return
       }
 
       await s3Client.send(
         new DeleteObjectCommand({
           Bucket: process.env.BUCKET_NAME,
-          Key: id,
+          Key: file.key,
           VersionId: deleteMarker.VersionId
         })
       )
@@ -49,9 +49,9 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
           TableName: 'FileboxFiles',
           Key: { id },
           ConditionExpression: '#status = :deleted',
-          UpdateExpression: 'SET #status = :uploaded',
+          UpdateExpression: 'SET #status = :available',
           ExpressionAttributeNames: { '#status': 'status' },
-          ExpressionAttributeValues: { ':deleted': 'deleted', ':uploaded': 'uploaded' }
+          ExpressionAttributeValues: { ':deleted': 'deleted', ':available': 'available' }
         }
       }))
     })

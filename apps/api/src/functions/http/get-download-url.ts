@@ -6,14 +6,11 @@ import { BatchGetCommand } from '@aws-sdk/lib-dynamodb'
 import { GetObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda'
-import type {
-  GetDownloadUrlsParams,
-  GetDownloadUrlsResult
-} from '@filebox/shared/http-contracts/get-download-urls.js'
-import { getFileExtension, getFileKey } from '@filebox/shared/utils/file.js'
+import type { GetDownloadUrlsResult } from '@filebox/shared/http-contracts/get-download-urls.js'
+import type { FileIdsParams } from '@filebox/shared/http-contracts/file-id-params.js'
 
 export async function handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> {
-  const { body } = parseHttpEvent<GetDownloadUrlsParams>(event)
+  const { body } = parseHttpEvent<FileIdsParams>(event)
   const { fileIds } = body
 
   const { Responses } = await dynamoDbClient.send(
@@ -24,12 +21,11 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
 
   const downloads = await Promise.all(
     files.map(async (file: any) => {
-      const fileKey = getFileKey(file.id, getFileExtension(file.name))
       const url = await getSignedUrl(
         s3Client,
         new GetObjectCommand({
           Bucket: process.env.BUCKET_NAME,
-          Key: fileKey,
+          Key: file.key,
           ResponseContentDisposition: `attachment; filename="${file.name}"`
         }),
         { expiresIn: 60 * 5 }

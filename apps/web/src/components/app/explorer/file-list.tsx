@@ -1,5 +1,6 @@
 import { FileIcon } from '@/components/file-icon'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -50,14 +51,29 @@ export function FileList() {
 
   const isSelected = (id: string) => selected.some((f) => f.id === id)
 
+  const allSelected = files.length > 0 && selected.length === files.length
+  const headerChecked: boolean | 'indeterminate' = allSelected
+    ? true
+    : selected.length > 0
+      ? 'indeterminate'
+      : false
+
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-auto">
       <Table>
-        <TableHeader className="sticky top-0 bg-muted/50 text-xs uppercase [&_th]:text-muted-foreground">
+        <TableHeader className="sticky top-0 bg-muted/50 text-xs uppercase [&_th]:h-8 [&_th]:text-muted-foreground">
           <TableRow>
-            <TableHead className="px-4">Name</TableHead>
-            <TableHead className="w-45">Uploaded At</TableHead>
-            <TableHead className="w-30">Permission</TableHead>
+            <TableHead className="w-10 pl-4">
+              <Checkbox
+                checked={headerChecked}
+                disabled={files.length === 0}
+                onCheckedChange={(checked) => setSelected(checked === true ? files : [])}
+                aria-label="Select all files"
+              />
+            </TableHead>
+            <TableHead>Name</TableHead>
+            <TableHead className="w-45">Date</TableHead>
+            <TableHead className="w-30">Type</TableHead>
             <TableHead className="w-25 px-4 text-right">Size</TableHead>
           </TableRow>
         </TableHeader>
@@ -65,7 +81,10 @@ export function FileList() {
           {isLoading &&
             Array.from({ length: 4 }).map((_, i) => (
               <TableRow key={i}>
-                <TableCell className="px-4">
+                <TableCell className="pl-4">
+                  <Skeleton className="size-4 rounded-sm" />
+                </TableCell>
+                <TableCell>
                   <span className="flex min-w-0 items-center gap-2">
                     <Skeleton className="size-5 shrink-0 rounded-sm" />
                     <Skeleton className="h-4 w-40" />
@@ -84,20 +103,28 @@ export function FileList() {
             ))}
           {!isLoading && files?.length === 0 && (
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={4} className="py-16">
+              <TableCell colSpan={5} className="py-16">
                 <div className="flex flex-col items-center justify-center gap-3 text-center">
                   <PackageOpenIcon className="size-12 text-muted-foreground/60" strokeWidth={1.5} />
                   <div className="space-y-1">
-                    <p className="font-semibold">No files uploaded here</p>
+                    <p className="font-semibold">No files uploaded yet</p>
                     <p className="text-sm text-muted-foreground">
                       Upload files from you computer or import them from a URL
                     </p>
                     <div className="item-center flex justify-center gap-2 p-3">
-                      <Button size="sm" variant="outline">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => window.dispatchEvent(new Event('filebox:request-upload'))}
+                      >
                         <UploadIcon />
                         Upload file
                       </Button>
-                      <Button size="sm" variant="ghost">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => window.dispatchEvent(new Event('filebox:focus-url-input'))}
+                      >
                         <LinkIcon />
                         Import from URL
                       </Button>
@@ -110,9 +137,6 @@ export function FileList() {
           {!isLoading &&
             files?.map((file) => (
               <TableRow
-                onContextMenu={() => {
-                  if (!isSelected(file.id)) setSelected([file])
-                }}
                 key={file.id}
                 onClick={(e) => {
                   if (e.ctrlKey || e.metaKey) toggleSelected(file)
@@ -122,7 +146,14 @@ export function FileList() {
                 data-state={isSelected(file.id) ? 'selected' : undefined}
                 className={cn('cursor-pointer')}
               >
-                <TableCell className="px-4">
+                <TableCell className="pl-4" onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    checked={isSelected(file.id)}
+                    onCheckedChange={() => toggleSelected(file)}
+                    aria-label={`Select ${file.name}`}
+                  />
+                </TableCell>
+                <TableCell>
                   <span className="flex min-w-0 items-center gap-2">
                     <FileIcon
                       className="size-5 shrink-0 text-muted-foreground"
@@ -148,7 +179,7 @@ export function FileList() {
                   </span>
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {file.uploadedAt ? format(file.uploadedAt, 'MMM dd, yyyy HH:mm') : '-'}
+                  {file.availableAt ? format(file.availableAt, 'MMM dd, yyyy HH:mm') : '-'}
                 </TableCell>
                 <TableCell className="text-muted-foreground">{file.contentType}</TableCell>
                 <TableCell className="px-4 text-right text-muted-foreground">

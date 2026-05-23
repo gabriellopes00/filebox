@@ -12,7 +12,7 @@ import {
   useSidebar
 } from '@/components/ui/sidebar'
 import { Trash2Icon, GalleryVerticalEndIcon, UploadIcon } from 'lucide-react'
-import { type ComponentProps, useState } from 'react'
+import { type ComponentProps, useEffect, useState } from 'react'
 import { SideBarTrash } from './side-bar-trash'
 import { SideBarUpload } from './side-bar-upload'
 
@@ -47,6 +47,18 @@ const tabs = [
 export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const [activeTab, setActiveTab] = useState(tabs[0].name)
   const { setOpen } = useSidebar()
+
+  useEffect(() => {
+    const handler = () => {
+      setActiveTab('upload')
+      setOpen(true)
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new Event('filebox:open-dropzone'))
+      })
+    }
+    window.addEventListener('filebox:request-upload', handler)
+    return () => window.removeEventListener('filebox:request-upload', handler)
+  }, [setOpen])
 
   return (
     <Sidebar

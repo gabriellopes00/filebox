@@ -165,7 +165,7 @@ export function FileIcon({
   ...props
 }: IconProps & {
   type: string
-  ext: string
+  ext?: string
 }) {
   if (type.startsWith('video/')) return <FileVideoIcon {...props} />
   else if (type.startsWith('audio/')) return <FileAudioIcon {...props} />
@@ -174,7 +174,7 @@ export function FileIcon({
   if (ext === 'pdf') return <FilePdfIcon {...props} />
   else if (ext === 'xlsx' || ext === 'xls') return <FileSheetIcon {...props} />
 
-  if (type.startsWith('text/') || ['txt', 'md', 'rtf', 'doc', 'docx'].includes(ext)) {
+  if (type.startsWith('text/') || ['txt', 'md', 'rtf', 'doc', 'docx'].includes(ext ?? '')) {
     return <FileTextIcon {...props} />
   }
   if (
@@ -194,7 +194,7 @@ export function FileIcon({
       'c',
       'cpp',
       'cs'
-    ].includes(ext)
+    ].includes(ext ?? '')
   ) {
     return <FileCodeIcon {...props} />
   }

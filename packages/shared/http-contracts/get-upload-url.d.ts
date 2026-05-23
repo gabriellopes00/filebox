@@ -8,7 +8,22 @@ export interface GetUploadUrlsParams {
   }[]
 }
 
-export type GetUploadUrlsResult = {
+export interface GetUploadUrlsResultSingle {
+  fileKey: string
   clientRef: string
   uploadUrl: string
-}[]
+}
+
+export interface GetUploadUrlsResultMultipart {
+  clientRef: string
+  partSize: number
+  fileId: string
+  parts: { partNumber: number; uploadUrl: string }[]
+}
+
+export interface GetUploadUrlsResult {
+  uploads: {
+    single: GetUploadUrlsResultSingle[]
+    multipart: GetUploadUrlsResultMultipart[]
+  }
+}

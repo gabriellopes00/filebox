@@ -1,0 +1,1 @@
+- instead of abort the multipart automatically on failure, should list the file as unavailable or something, and allow to complete multipart upload with a single file  on details view

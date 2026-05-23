@@ -6,7 +6,7 @@ import {
   SidebarGroup,
   SidebarGroupContent
 } from '@/components/ui/sidebar'
-import { TrashIcon, UploadIcon, XIcon } from 'lucide-react'
+import { RotateCwIcon, TrashIcon, UploadIcon, XIcon } from 'lucide-react'
 import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -14,7 +14,11 @@ import { useForm } from 'react-hook-form'
 import { Spinner } from '@/components/ui/spinner'
 import { toast } from 'sonner'
 import { nanoid } from 'nanoid'
-import type { GetUploadUrlsParams } from '@filebox/shared/http-contracts/get-upload-url'
+import type {
+  GetUploadUrlsParams,
+  GetUploadUrlsResultMultipart,
+  GetUploadUrlsResultSingle
+} from '@filebox/shared/http-contracts/get-upload-url'
 import { FileApi, type FileUploadStatus } from '@/api/files-api'
 import { cn } from '@/lib/cn'
 import { computeFileChecksum } from '@/lib/checksum'
@@ -22,7 +26,7 @@ import { FileUploadItemPreview } from './file-upload-item-preview'
 import { FileUploadItemMetadata } from './file-upload-item-metadata'
 import { FileUploadItemProgress } from './file-upload-item-progress'
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import pLimit from 'p-limit'
 import { Separator } from '@/components/ui/separator'
 import { Field, FieldDescription } from '@/components/ui/field'
@@ -33,6 +37,11 @@ import { Kbd } from '@/components/ui/kbd'
 const hashLimit = pLimit(3)
 const hashAbortControllers = new Map<string, AbortController>()
 
+type CachedUpload =
+  | { kind: 'multipart'; data: GetUploadUrlsResultMultipart }
+  | { kind: 'single'; data: GetUploadUrlsResultSingle }
+const uploadCache = new Map<string, CachedUpload>()
+
 type FormFile = { data: File; progress: number; status: FileUploadStatus; checksum?: string }
 interface UploadFormValues {
   files: Record<string, FormFile>
@@ -41,38 +50,125 @@ interface UploadFormValues {
 export function SideBarUpload() {
   const queryClient = useQueryClient()
   const form = useForm<UploadFormValues>({ defaultValues: { files: {} } })
+  const [retryingRefs, setRetryingRefs] = useState<Set<string>>(new Set())
 
-  async function onSubmit(_values: UploadFormValues) {
-    try {
+  async function uploadFiles(
+    refs: string[]
+  ): Promise<{ succeededRefs: string[]; failedRefs: string[] }> {
+    const files = form.getValues('files')
+
+    const freshRefs = refs.filter((ref) => !uploadCache.has(ref))
+    console.log({ freshRefs })
+
+    if (freshRefs.length > 0) {
       const params: GetUploadUrlsParams = {
-        files: Object.entries(files).map(([clientRef, file]) => ({
+        files: freshRefs.map((clientRef) => ({
           clientRef,
-          filename: file.data.name,
-          size: file.data.size,
-          contentType: file.data.type,
-          checksum: file.checksum!
+          filename: files[clientRef].data.name,
+          size: files[clientRef].data.size,
+          contentType: files[clientRef].data.type,
+          checksum: files[clientRef].checksum!
         }))
       }
 
-      const result = await FileApi.getUploadUrls(params)
-      // await queryClient.setQueryData // use optimistic update to set files data into cache of query key = "files "
-
-      await Promise.allSettled(
-        Array.from(result.entries()).map(([fileRef, uploadUrl]) =>
-          FileApi.upload(
-            uploadUrl,
-            files[fileRef].data,
-            files[fileRef].checksum!,
-            (progress) => form.setValue(`files.${fileRef}.progress`, progress),
-            (status) => form.setValue(`files.${fileRef}.status`, status)
-          )
+      try {
+        const uploads = await FileApi.getUploadUrls(params)
+        uploads.single.forEach((data) => uploadCache.set(data.clientRef, { kind: 'single', data }))
+        uploads.multipart.forEach((data) =>
+          uploadCache.set(data.clientRef, { kind: 'multipart', data })
         )
-      )
+      } catch {
+        // If cannot get the URLs, mark fresh ones as failed; cached ones still get a retry attempt below
+        freshRefs.forEach((ref) => form.setValue(`files.${ref}.status`, 'error'))
+        const cachedRefs = refs.filter((ref) => uploadCache.has(ref))
+        if (cachedRefs.length === 0) return { succeededRefs: [], failedRefs: refs }
+        refs = cachedRefs
+      }
+    }
 
-      await queryClient.invalidateQueries({ queryKey: ['files'] })
-      toast.success('Files uploaded successfully')
-    } catch (error) {
-      toast.error('Failed to upload files')
+    const results = await Promise.allSettled(
+      refs
+        .map((ref) => ({ ref, cached: uploadCache.get(ref) }))
+        .filter((entry): entry is { ref: string; cached: CachedUpload } => !!entry.cached)
+        .map(async ({ ref, cached }) => {
+          if (cached.kind === 'multipart') {
+            await FileApi.uploadMultipart(
+              cached.data,
+              files[ref].data,
+              (progress) => form.setValue(`files.${ref}.progress`, progress),
+              (status) => form.setValue(`files.${ref}.status`, status)
+            )
+          } else {
+            await FileApi.uploadSingle(
+              cached.data.uploadUrl,
+              files[ref].data,
+              files[ref].checksum!,
+              (progress) => form.setValue(`files.${ref}.progress`, progress),
+              (status) => form.setValue(`files.${ref}.status`, status)
+            )
+          }
+          return ref
+        })
+    )
+
+    const succeededRefs: string[] = []
+    const failedRefs: string[] = []
+
+    results.forEach((res) => {
+      if (res.status === 'fulfilled') {
+        console.log({ ref: res.value })
+        succeededRefs.push(res.value)
+        uploadCache.delete(res.value)
+      }
+    })
+
+    refs.forEach((ref) => {
+      if (!succeededRefs.includes(ref)) failedRefs.push(ref)
+    })
+
+    return { succeededRefs, failedRefs }
+  }
+
+  async function onSubmit(formValues: UploadFormValues) {
+    const refs = Object.keys(formValues.files)
+    const { succeededRefs, failedRefs } = await uploadFiles(refs)
+
+    const currentFiles = form.getValues('files')
+    const remaining = Object.fromEntries(
+      Object.entries(currentFiles).filter(([ref]) => !succeededRefs.includes(ref))
+    )
+
+    form.setValue('files', remaining)
+
+    if (failedRefs.length === 0) toast.success('Files uploaded successfully')
+    else if (succeededRefs.length === 0) toast.error('Failed to upload files')
+    else toast.warning('Files uploaded. Some failed')
+
+    await queryClient.invalidateQueries({ queryKey: ['files'] })
+  }
+
+  async function handleRetryFile(clientRef: string) {
+    setRetryingRefs((prev) => new Set(prev).add(clientRef))
+    try {
+      form.setValue(`files.${clientRef}.status`, 'uploading')
+      form.setValue(`files.${clientRef}.progress`, 0)
+
+      const { succeededRefs } = await uploadFiles([clientRef])
+      if (succeededRefs.length > 0) {
+        await queryClient.invalidateQueries({ queryKey: ['files'] })
+        const remaining = { ...form.getValues('files') }
+        delete remaining[clientRef]
+        form.setValue('files', remaining)
+        toast.success('File uploaded successfully')
+      } else {
+        toast.error('Failed to upload file')
+      }
+    } finally {
+      setRetryingRefs((prev) => {
+        const next = new Set(prev)
+        next.delete(clientRef)
+        return next
+      })
     }
   }
 
@@ -82,6 +178,7 @@ export function SideBarUpload() {
     Object.keys(currentFiles).forEach((fileRef) => {
       hashAbortControllers.get(fileRef)?.abort()
       hashAbortControllers.delete(fileRef)
+      uploadCache.delete(fileRef)
     })
 
     form.setValue('files', {})
@@ -90,6 +187,7 @@ export function SideBarUpload() {
   function handleRemoveFile(fileRef: string) {
     hashAbortControllers.get(fileRef)?.abort()
     hashAbortControllers.delete(fileRef)
+    uploadCache.delete(fileRef)
 
     const prev = form.getValues('files')
     const updated = Object.fromEntries(Object.entries(prev).filter(([k]) => k !== fileRef))
@@ -110,10 +208,18 @@ export function SideBarUpload() {
     })
   }
 
+  const files = form.watch('files')
+  const hasSomeError = Object.values(files).some((file) => file.status === 'error')
+  const isReady = Object.values(files).every(
+    (file) => file.status !== 'waiting' && file.status !== 'hashing'
+  )
+
+  const disableInput =
+    form.formState.isSubmitting || !isReady || retryingRefs.size > 0 || hasSomeError
   const dropzone = useDropzone({
-    disabled: form.formState.isSubmitting,
+    disabled: disableInput,
     maxFiles: 10,
-    maxSize: 500 * 1024 * 1024, // 500MB
+    maxSize: 1000 * 1024 * 1024, // 1GB
     multiple: true,
     onDropAccepted: (newFiles) => handleAddFiles(newFiles),
     onDropRejected: (rejections) => {
@@ -125,14 +231,21 @@ export function SideBarUpload() {
     }
   })
 
-  const files = form.watch('files')
-  const isReady = Object.values(files).every(
-    (file) => file.status !== 'waiting' && file.status !== 'hashing'
-  )
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const dropzoneOpenRef = useRef(dropzone.open)
+  dropzoneOpenRef.current = dropzone.open
 
   useEffect(() => {
-    if (form.formState.isSubmitSuccessful) form.reset()
-  }, [form.formState.isSubmitSuccessful, form.reset])
+    const handler = () => dropzoneOpenRef.current()
+    window.addEventListener('filebox:open-dropzone', handler)
+    return () => window.removeEventListener('filebox:open-dropzone', handler)
+  }, [])
+
+  useEffect(() => {
+    const handler = () => inputRef.current?.focus()
+    window.addEventListener('filebox:focus-url-input', handler)
+    return () => window.removeEventListener('filebox:focus-url-input', handler)
+  }, [])
 
   useEffect(() => {
     const waitingFiles = Object.entries(files).filter(([, file]) => file.status === 'waiting')
@@ -174,7 +287,7 @@ export function SideBarUpload() {
   }, [files, form])
 
   return (
-    <Sidebar collapsible="none" className="hidden flex-1 md:flex">
+    <Sidebar collapsible="none" className="hidden min-w-0 flex-1 md:flex">
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
         <SidebarHeader>
           <div className="p-4 text-base font-medium text-foreground">Upload</div>
@@ -182,7 +295,7 @@ export function SideBarUpload() {
             {...dropzone.getRootProps()}
             data-dragging={dropzone.isDragActive ? '' : undefined}
             data-invalid={dropzone.fileRejections.length > 0 ? '' : undefined}
-            data-disabled={form.formState.isSubmitting ? '' : undefined}
+            data-disabled={disableInput ? '' : undefined}
             className="relative flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6 transition-colors outline-none select-none hover:bg-accent/30 focus-visible:border-ring/50 data-dragging:border-primary/30 data-dragging:bg-accent/30 data-invalid:border-destructive data-invalid:ring-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50"
           >
             <input {...dropzone.getInputProps()} />
@@ -192,7 +305,7 @@ export function SideBarUpload() {
               </div>
               <p className="text-sm font-medium">Drag & drop files here</p>
               <p className="text-xs text-muted-foreground">
-                Or click to browse (max 10 files, up to 500MB each)
+                Or click to browse (max 10 files, up to 1GB each)
               </p>
             </div>
             <Button variant="outline" size="sm" className="mt-2 w-fit" type="button">
@@ -212,7 +325,11 @@ export function SideBarUpload() {
               <Field>
                 <ButtonGroup>
                   <InputGroup>
-                    <InputGroupInput id="input-group-url" placeholder="https://myfile.pdf" />
+                    <InputGroupInput
+                      ref={inputRef}
+                      id="input-group-url"
+                      placeholder="https://myfile.pdf"
+                    />
                     <InputGroupAddon align="inline-end">
                       <Kbd className="ml-1">Ctrl + v</Kbd>
                     </InputGroupAddon>
@@ -241,9 +358,9 @@ export function SideBarUpload() {
                 {Object.entries(files).map(([fileRef, file]) => (
                   <div
                     key={fileRef}
-                    className="relative flex flex-col items-center gap-2.5 rounded-md border p-3"
+                    className="relative flex min-w-0 flex-col items-center gap-2.5 rounded-md border p-3"
                   >
-                    <div className="flex w-full items-center gap-2">
+                    <div className="flex w-full min-w-0 items-center gap-2">
                       <FileUploadItemPreview file={file.data} />
                       <FileUploadItemMetadata file={file.data} />
                       {(file.status === 'ready' ||
@@ -259,6 +376,19 @@ export function SideBarUpload() {
                           onClick={() => handleRemoveFile(fileRef)}
                         >
                           <XIcon />
+                        </Button>
+                      )}
+                      {file.status === 'error' && !retryingRefs.has(fileRef) && (
+                        <Button
+                          type="button"
+                          tooltip="Retry"
+                          variant="ghost"
+                          size="icon"
+                          className="size-7"
+                          disabled={retryingRefs.has(fileRef)}
+                          onClick={() => handleRetryFile(fileRef)}
+                        >
+                          <RotateCwIcon />
                         </Button>
                       )}
                     </div>
@@ -303,11 +433,13 @@ export function SideBarUpload() {
               <Button
                 className="flex-1"
                 type="submit"
-                disabled={form.formState.isSubmitting || !isReady}
+                disabled={
+                  form.formState.isSubmitting || !isReady || retryingRefs.size > 0 || hasSomeError
+                }
               >
-                {(form.formState.isSubmitting || !isReady) && <Spinner />}
+                {(form.formState.isSubmitting || !isReady || retryingRefs.size > 0) && <Spinner />}
                 {isReady
-                  ? form.formState.isSubmitting
+                  ? form.formState.isSubmitting || retryingRefs.size > 0
                     ? 'Uploading...'
                     : 'Upload'
                   : 'Preparing...'}

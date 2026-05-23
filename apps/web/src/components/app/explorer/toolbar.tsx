@@ -16,10 +16,8 @@ import { useFileExplorer } from './file-explorer-context'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { useState, type ComponentProps } from 'react'
 import { cn } from '@/lib/cn'
-import { getFileExtension, getFileKey, getFileName } from '@filebox/shared/utils/file'
 import { FileApi } from '@/api/files-api'
 import { queryClient } from '@/lib/react-query'
-import type { FileData } from '@filebox/shared/data/file-data'
 import type { CopyFilesParams } from '@filebox/shared/http-contracts/copy-files.js'
 import type { DeleteFilesParams } from '@filebox/shared/http-contracts/delete-files'
 import { useMutation } from '@tanstack/react-query'
@@ -37,17 +35,14 @@ export function Toolbar() {
   const deleteMutation = useMutation<void, Error, DeleteFilesParams>({
     mutationKey: ['delete-file'],
     mutationFn: (params) => FileApi.delete(params),
-    onSuccess: (_, { fileKeys }) => {
-      const fileIds = fileKeys.map((key) => getFileName(key))
-      queryClient.setQueryData<FileData[]>(['files'], (prev) =>
-        prev?.filter((f) => !fileIds.includes(f.id))
-      )
+    onSuccess: async (_, { fileIds }) => {
+      await queryClient.invalidateQueries({ queryKey: ['files'] })
       setSelected([])
-      toast.success(fileKeys.length > 1 ? `${fileKeys.length} files deleted` : 'File deleted')
+      toast.success(fileIds.length > 1 ? `${fileIds.length} files deleted` : 'File deleted')
     },
-    onError: (error, { fileKeys }) => {
+    onError: (error, { fileIds }) => {
       console.error('Error deleting file:', error)
-      toast.error(fileKeys.length > 1 ? 'Error deleting files' : 'Error deleting file')
+      toast.error(fileIds.length > 1 ? 'Error deleting files' : 'Error deleting file')
     },
     onSettled: () => setDeleteOpen(false)
   })
@@ -121,7 +116,7 @@ export function Toolbar() {
                 Are you sure you want to delete {selected.length > 1 ? 'these files' : 'this file'}?{' '}
                 <br />
                 {selected.length > 1 ? 'They' : 'It'} will be moved to the trash and can be restored
-                within 30 days. <br /> After that, {selected.length > 1 ? 'they' : 'it'} will be
+                within 3 days. <br /> After that, {selected.length > 1 ? 'they' : 'it'} will be
                 permanently deleted.
               </p>
             </div>
@@ -130,10 +125,7 @@ export function Toolbar() {
               variant="destructive"
               size="sm"
               onClick={() =>
-                selected.length > 0 &&
-                deleteMutation.mutate({
-                  fileKeys: selected.map((f) => getFileKey(f.id, getFileExtension(f.name)))
-                })
+                selected.length > 0 && deleteMutation.mutate({ fileIds: selected.map((f) => f.id) })
               }
               disabled={selected.length === 0 || deleteMutation.isPending}
             >

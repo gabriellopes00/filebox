@@ -2,7 +2,7 @@ export function getFileExtension(filename: string): string {
   return filename.split('.').pop()?.toLowerCase() ?? ''
 }
 
-export function getFileKey(fileId: string, fileExtension?: string): string {
+export function generateFileKey(fileId: string, fileExtension?: string): string {
   return `${fileId}${fileExtension ? `.${fileExtension}` : ''}`
 }
 

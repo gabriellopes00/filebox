@@ -1,5 +1,5 @@
 import { FileApi } from '@/api/files-api'
-import type { FileData } from '@filebox/shared/data/file-data'
+import type { FileData, FileStatus } from '@filebox/shared/data/file-data'
 import { useQuery } from '@tanstack/react-query'
 import { createContext, use, useCallback, useState, type ReactNode } from 'react'
 
@@ -31,13 +31,14 @@ export function FileExplorerProvider({ children }: { children: ReactNode }) {
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [showDrawer, setShowDrawer] = useState(true)
 
+  const statuses: FileStatus[] = ['pending', 'available', 'unavailable']
   const {
     data: files = [],
     isLoading,
     refetch
   } = useQuery({
-    queryKey: ['files'],
-    queryFn: () => FileApi.getFiles()
+    queryKey: ['files', statuses],
+    queryFn: () => FileApi.getFiles(statuses)
   })
 
   const triggerRename = useCallback((id: string) => setRenamingId(id), [])

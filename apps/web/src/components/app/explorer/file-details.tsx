@@ -60,14 +60,15 @@ export function FileDetails() {
 
           <dt className="text-muted-foreground">Status</dt>
           <dd className="truncate">
-            {file.status === 'uploaded' && 'Available'}
+            {file.status === 'available' && 'Available'}
+            {file.status === 'unavailable' && 'Unavailable'}
             {file.status === 'pending' && 'Processing...'}
             {file.status === 'deleting' && 'Deleting...'}
           </dd>
 
           <dt className="text-muted-foreground">Uploaded at</dt>
           <dd className="truncate">
-            {file.uploadedAt ? format(file.uploadedAt, 'MMM dd, yyyy') : '-'}
+            {file.availableAt ? format(file.availableAt, 'MMM dd, yyyy') : '-'}
           </dd>
 
           {file.checksum && (

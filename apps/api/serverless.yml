@@ -41,6 +41,7 @@ provider:
           Action:
             - s3:*
           Resource:
+            - arn:aws:s3:::${env:BUCKET_NAME}
             - arn:aws:s3:::${env:BUCKET_NAME}/*
 
 plugins:
@@ -49,6 +50,7 @@ plugins:
 
 build:
   esbuild:
+    bundle: true
     minify: true
     sourcemap: false
 
@@ -68,6 +70,18 @@ functions:
       - httpApi:
           path: /upload
           method: POST
+  complete-mpu:
+    handler: src/functions/http/complete-mpu.handler
+    events:
+      - httpApi:
+          path: /upload/mpu/{fileId}/complete
+          method: POST
+  abort-mpu:
+    handler: src/functions/http/abort-mpu.handler
+    events:
+      - httpApi:
+          path: /upload/mpu/{fileId}/abort
+          method: POST
   list-files:
     handler: src/functions/http/list-files.handler
     events:
@@ -79,6 +93,12 @@ functions:
     events:
       - httpApi:
           path: /files/delete
+          method: POST
+  confirm-delete-files:
+    handler: src/functions/http/confirm-delete-files.handler
+    events:
+      - httpApi:
+          path: /files/delete/confirm
           method: POST
   copy-files:
     handler: src/functions/http/copy-files.handler
