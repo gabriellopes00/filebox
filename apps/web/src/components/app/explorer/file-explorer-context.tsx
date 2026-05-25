@@ -31,7 +31,7 @@ export function FileExplorerProvider({ children }: { children: ReactNode }) {
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [showDrawer, setShowDrawer] = useState(true)
 
-  const statuses: FileStatus[] = ['pending', 'available', 'unavailable']
+  const statuses: FileStatus[] = ['pending', 'available']
   const {
     data: files = [],
     isLoading,

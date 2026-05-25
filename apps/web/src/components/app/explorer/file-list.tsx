@@ -15,7 +15,14 @@ import { cn } from '@/lib/cn'
 import { formatBytes } from '@/utils/format-bytes'
 import { getFileExtension } from '@filebox/shared/utils/file'
 import { format } from 'date-fns'
-import { CheckIcon, LinkIcon, PackageOpenIcon, UploadIcon, XIcon } from 'lucide-react'
+import {
+  CheckIcon,
+  CircleAlertIcon,
+  LinkIcon,
+  PackageOpenIcon,
+  UploadIcon,
+  XIcon
+} from 'lucide-react'
 import {
   useEffect,
   useRef,
@@ -30,6 +37,7 @@ import { queryClient } from '@/lib/react-query'
 import { toast } from 'sonner'
 import { useMutation } from '@tanstack/react-query'
 import { Spinner } from '@/components/ui/spinner'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export function FileList() {
   const { files, isLoading, selected, setSelected, toggleSelected, renamingId, closeRename } =
@@ -174,7 +182,22 @@ export function FileList() {
                         onCancel={closeRename}
                       />
                     ) : (
-                      <span className="min-w-0 truncate">{file.name}</span>
+                      <span className="flex min-w-0 items-center gap-1 truncate">
+                        {file.name}{' '}
+                        {file.status !== 'available' && (
+                          <Tooltip>
+                            <TooltipContent>
+                              <p>
+                                This file is not available yet. It might take a few minutes to be
+                                ready or there might be an issue with the upload.
+                              </p>
+                            </TooltipContent>
+                            <TooltipTrigger>
+                              <CircleAlertIcon className="size-4 text-yellow-500" />
+                            </TooltipTrigger>
+                          </Tooltip>
+                        )}
+                      </span>
                     )}
                   </span>
                 </TableCell>

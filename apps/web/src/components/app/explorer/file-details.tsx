@@ -61,7 +61,6 @@ export function FileDetails() {
           <dt className="text-muted-foreground">Status</dt>
           <dd className="truncate">
             {file.status === 'available' && 'Available'}
-            {file.status === 'unavailable' && 'Unavailable'}
             {file.status === 'pending' && 'Processing...'}
             {file.status === 'deleting' && 'Deleting...'}
           </dd>

@@ -16,6 +16,18 @@ Complete upload & download flow with AWS S3 pre-signed URLs and large file proce
 - [ ] Video streaming support
 - [ ] Folder support with prefix-based operations
 - [ ] Image processing with AWS SQS and Lambda
+- [ ] Import files from external URLs
+
+## AWS costs
+
+Filebox is built entirely on pay-per-use AWS primitives, so an idle deployment costs effectively nothing:
+
+- **Lambda** — no charge while idle; the free tier covers 1M requests + 400k GB-seconds per month.
+- **API Gateway (HTTP API)** — billed per request only; first 1M requests/month are free for the first 12 months.
+- **DynamoDB** — table is `PAY_PER_REQUEST`, so you only pay for reads/writes you actually make.
+- **S3** — you pay for what you store and the requests you issue; lifecycle rules (below) keep junk from piling up.
+
+For light personal use, expect the monthly bill to be in the cents range — the dominant cost is whatever you actually store in S3.
 
 ## Project stack & layout
 This project is a monorepo managed with pnpm workspaces, containing the backend API and the frontend web app, along with shared types and utilities in a separate package.
@@ -34,7 +46,6 @@ packages/
 - Node.js 20+
 - [pnpm](https://pnpm.io/installation)
 - An AWS account with credentials configured (`aws configure`)
-- An existing S3 bucket
 
 ### 1. Install dependencies
 
@@ -42,7 +53,42 @@ packages/
 pnpm install
 ```
 
-### 2. Configure environment variables
+### 2. Create the S3 bucket
+
+The Serverless stack does **not** create the bucket — it expects one to already exist (because S3 event triggers are wired up with `existing: true`). Create it once via the AWS Console:
+
+1. **S3 → Create bucket**
+   - Pick a globally unique name and a region close to you.
+   - Leave **Block all public access** enabled (Filebox uses presigned URLs, never public objects).
+   - **Enable Bucket Versioning** — this is required for the soft-delete/restore flow to work (it relies on S3 delete markers).
+2. **Permissions → CORS** — paste the rule below so the web app can `PUT`/`GET` directly to S3:
+   ```json
+   [
+     {
+       "AllowedHeaders": ["*"],
+       "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
+       "AllowedOrigins": ["*"],
+       "ExposeHeaders": ["ETag"]
+     }
+   ]
+   ```
+   Tighten `AllowedOrigins` to your web app's URL for production.
+3. **Management → Lifecycle rules → Create lifecycle rule** — add the two rules below. Both keep the bucket tidy and avoid paying for hidden storage.
+
+   **Rule A — expire delete markers & old versions** (completes the soft-delete flow):
+   - Rule name: `cleanup-deleted-files`
+   - Scope: *Apply to all objects in the bucket*
+   - Actions:
+     - ✅ *Permanently delete noncurrent versions of objects* — set **Days after objects become noncurrent** to whatever retention you want (e.g. `30`). This is what eventually fires the `s3:ObjectRemoved:Delete` event that cleans up the DynamoDB row.
+     - ✅ *Delete expired object delete markers or incomplete multipart uploads* → check **Delete expired object delete markers**.
+
+   **Rule B — abort incomplete multipart uploads** (frees orphaned upload parts):
+   - Rule name: `abort-incomplete-mpu`
+   - Scope: *Apply to all objects in the bucket*
+   - Actions:
+     - ✅ *Delete expired object delete markers or incomplete multipart uploads* → check **Delete incomplete multipart uploads** and set **Number of days** to `1` (or `7` if you want a wider safety net). Without this, every failed/abandoned multipart upload keeps its parts in S3 forever and you keep paying for them.
+
+### 3. Configure environment variables
 
 Copy **`apps/api/.env.example`** to **`apps/api/.env`** — set your bucket name:
 
@@ -56,7 +102,7 @@ Same thing on web app: **`apps/web/.env`** — point the web app at your API:
 VITE_SERVER_URL=http://localhost:3000
 ```
 
-### 3. Run in development
+### 4. Run in development
 
 From the repo root, start both apps in parallel:
 
@@ -74,7 +120,7 @@ pnpm --filter api dev
 pnpm --filter web dev
 ```
 
-### 4. Deploy the API
+### 5. Deploy the API
 
 Inside `apps/api`:
 

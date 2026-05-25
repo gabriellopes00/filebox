@@ -9,8 +9,7 @@ import {
   Share2Icon,
   PanelRightIcon,
   PlayIcon,
-  FolderPlusIcon,
-  XIcon
+  FolderPlusIcon
 } from 'lucide-react'
 import { useFileExplorer } from './file-explorer-context'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
@@ -18,13 +17,11 @@ import { useState, type ComponentProps } from 'react'
 import { cn } from '@/lib/cn'
 import { FileApi } from '@/api/files-api'
 import { queryClient } from '@/lib/react-query'
-import type { CopyFilesParams } from '@filebox/shared/http-contracts/copy-files.js'
-import type { DeleteFilesParams } from '@filebox/shared/http-contracts/delete-files'
+import type { FileIdsParams } from '@filebox/shared/http-contracts/file-id-params'
 import { useMutation } from '@tanstack/react-query'
 import { Spinner } from '@/components/ui/spinner'
 import { Toggle } from '@/components/ui/toggle'
 import { toast } from 'sonner'
-import type { GetDownloadUrlsParams } from '@filebox/shared/http-contracts/get-download-urls'
 import { downloadFile } from '@/utils/download-file'
 
 export function Toolbar() {
@@ -32,7 +29,7 @@ export function Toolbar() {
     useFileExplorer()
   const [deleteOpen, setDeleteOpen] = useState(false)
 
-  const deleteMutation = useMutation<void, Error, DeleteFilesParams>({
+  const deleteMutation = useMutation<void, Error, FileIdsParams>({
     mutationKey: ['delete-file'],
     mutationFn: (params) => FileApi.delete(params),
     onSuccess: async (_, { fileIds }) => {
@@ -47,7 +44,7 @@ export function Toolbar() {
     onSettled: () => setDeleteOpen(false)
   })
 
-  const downloadMutation = useMutation<void, Error, GetDownloadUrlsParams>({
+  const downloadMutation = useMutation<void, Error, FileIdsParams>({
     mutationKey: ['download-file'],
     mutationFn: async (params) => {
       const result = await FileApi.getDownloadUrls(params)
@@ -57,7 +54,7 @@ export function Toolbar() {
     }
   })
 
-  const copyMutation = useMutation<void, Error, CopyFilesParams>({
+  const copyMutation = useMutation<void, Error, FileIdsParams>({
     mutationKey: ['copy-file'],
     mutationFn: (params) => FileApi.copy(params),
     onSuccess: async (_, { fileIds }) => {
@@ -78,7 +75,11 @@ export function Toolbar() {
       </div>
 
       <ToolbarButton
-        disabled={selected.length === 0 || copyMutation.isPending}
+        disabled={
+          selected.length === 0 ||
+          copyMutation.isPending ||
+          !selected.every((file) => file.status === 'available')
+        }
         icon={<CopyIcon />}
         label="Copy"
         loading={copyMutation.isPending}
@@ -88,7 +89,11 @@ export function Toolbar() {
       {/* <ToolbarButton disabled={selected.length === 0} icon={<MoveIcon />} label="Move" /> */}
 
       <ToolbarButton
-        disabled={selected.length === 0 || downloadMutation.isPending}
+        disabled={
+          selected.length === 0 ||
+          downloadMutation.isPending ||
+          !selected.every((file) => file.status === 'available')
+        }
         icon={<DownloadIcon />}
         label="Download"
         loading={downloadMutation.isPending}
@@ -96,13 +101,17 @@ export function Toolbar() {
       />
 
       <ToolbarButton
-        disabled={selected.length !== 1}
+        disabled={selected.length !== 1 || !selected.every((file) => file.status === 'available')}
         icon={<PencilIcon />}
         onClick={() => selected.length === 1 && triggerRename(selected[0].id)}
         label="Rename"
       />
 
-      <ToolbarButton disabled={selected.length === 0} icon={<Share2Icon />} label="Share" />
+      <ToolbarButton
+        disabled={selected.length === 0 || !selected.every((file) => file.status === 'available')}
+        icon={<Share2Icon />}
+        label="Share"
+      />
 
       <Popover open={deleteOpen} onOpenChange={setDeleteOpen}>
         <PopoverTrigger asChild disabled={selected.length === 0}>
@@ -144,18 +153,7 @@ export function Toolbar() {
       />
 
       {selected.length > 1 && (
-        <div className="ml-auto flex items-center">
-          <p className="mr-2 text-xs text-muted-foreground">Selected ({selected.length})</p>
-          <Button
-            onClick={() => setSelected([])}
-            size="xs"
-            variant="link"
-            className="text-muted-foreground"
-          >
-            Unselect all
-            <XIcon />
-          </Button>
-        </div>
+        <p className="mr-2 ml-auto text-xs text-muted-foreground">Selected ({selected.length})</p>
       )}
 
       <Separator

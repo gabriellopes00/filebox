@@ -33,7 +33,5 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
 
   await s3Client.send(command)
 
-  // TODO: remove file.uploadId and set availableAt
-
   return parseHttpResponse(204)
 }

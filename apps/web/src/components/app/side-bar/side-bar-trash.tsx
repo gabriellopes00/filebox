@@ -17,7 +17,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/cn'
 import { queryClient } from '@/lib/react-query'
 import { formatBytes } from '@/utils/format-bytes'
-import type { DeleteFilesParams } from '@filebox/shared/http-contracts/delete-files'
+import type { FileIdsParams } from '@filebox/shared/http-contracts/file-id-params'
 import { getFileExtension } from '@filebox/shared/utils/file'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { RotateCcwIcon, Trash2Icon, TrashIcon, XIcon } from 'lucide-react'
@@ -27,14 +27,14 @@ import { toast } from 'sonner'
 export function SideBarTrash() {
   const { data: files = [], isLoading } = useQuery({
     queryKey: ['files', 'trash'],
-    queryFn: () => FileApi.getFiles(['deleting', 'deleted', 'delete_failed'])
+    queryFn: () => FileApi.getFiles(['deleting', 'deleted'])
   })
 
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
-  const restoreMutation = useMutation<void, Error, DeleteFilesParams>({
+  const restoreMutation = useMutation<void, Error, FileIdsParams>({
     mutationKey: ['restore-files'],
     mutationFn: (params) => FileApi.restore(params),
     onSuccess: async (_, { fileIds }) => {
@@ -48,7 +48,7 @@ export function SideBarTrash() {
     }
   })
 
-  const confirmDeleteMutation = useMutation<void, Error, DeleteFilesParams>({
+  const confirmDeleteMutation = useMutation<void, Error, FileIdsParams>({
     mutationKey: ['confirm-delete-files'],
     mutationFn: (params) => FileApi.confirmDeletion(params),
     onSuccess: async (_async, { fileIds }) => {
